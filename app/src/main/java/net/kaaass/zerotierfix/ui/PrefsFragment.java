@@ -29,6 +29,7 @@ import net.kaaass.zerotierfix.R;
 import net.kaaass.zerotierfix.service.ZeroTierOneService;
 import net.kaaass.zerotierfix.util.Constants;
 import net.kaaass.zerotierfix.util.FileUtil;
+import net.kaaass.zerotierfix.util.PlanetFile;
 
 import org.apache.commons.io.FileUtils;
 
@@ -61,6 +62,10 @@ public class PrefsFragment extends PreferenceFragmentCompat implements SharedPre
     private Dialog planetDialog = null;
     private Dialog loadingDialog = null;
     private ActivityResultLauncher<Intent> planetFileSelectLauncher = null;
+    /**
+     * 最近一次导入 Planet 文件失败时用于提示的字符串资源
+     */
+    private int planetErrorRes = R.string.planet_wrong_format;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -87,7 +92,7 @@ public class PrefsFragment extends PreferenceFragmentCompat implements SharedPre
                     boolean success = dealTempPlanetFile();
                     if (!success) {
                         // 校验失败
-                        Toast.makeText(getContext(), R.string.planet_wrong_format, Toast.LENGTH_LONG).show();
+                        Toast.makeText(getContext(), this.planetErrorRes, Toast.LENGTH_LONG).show();
                         closePlanetDialog();
                         return;
                     }
@@ -215,7 +220,7 @@ public class PrefsFragment extends PreferenceFragmentCompat implements SharedPre
                             if (!success) {
                                 // 校验失败
                                 requireActivity().runOnUiThread(() -> {
-                                    Toast.makeText(getContext(), R.string.planet_wrong_format, Toast.LENGTH_LONG).show();
+                                    Toast.makeText(getContext(), this.planetErrorRes, Toast.LENGTH_LONG).show();
                                     closePlanetDialog();
                                     closeLoadingDialog();
                                 });
@@ -295,6 +300,21 @@ public class PrefsFragment extends PreferenceFragmentCompat implements SharedPre
         boolean useCustom = PreferenceManager.getDefaultSharedPreferences(getContext())
                 .getBoolean(Constants.PREF_PLANET_USE_CUSTOM, false);
         this.prefSetPlanetFile.setEnabled(useCustom);
+
+        // 显示当前自定义 Planet 的 ID，便于确认是否连接到了自建 Planet
+        File planetFile = new File(requireActivity().getFilesDir(), Constants.FILE_CUSTOM_PLANET);
+        if (planetFile.exists()) {
+            try {
+                PlanetFile planet = PlanetFile.parse(planetFile);
+                this.prefSetPlanetFile.setSummary(
+                        getString(R.string.planet_id_summary, planet.getIdString()));
+            } catch (IOException | PlanetFile.FormatException e) {
+                Log.w(TAG, "Cannot read custom planet file", e);
+                this.prefSetPlanetFile.setSummary(R.string.planet_incompatible);
+            }
+        } else {
+            this.prefSetPlanetFile.setSummary(R.string.load_planet_summary);
+        }
     }
 
     /**
@@ -302,6 +322,7 @@ public class PrefsFragment extends PreferenceFragmentCompat implements SharedPre
      */
     private boolean dealTempPlanetFile() {
         // Plant 文件校验
+        this.planetErrorRes = R.string.planet_wrong_format;
         File temp = FileUtil.tempFile(requireContext());
         byte[] buf = new byte[PLANET_FILE_HEADER.length];
         try (FileInputStream in = new FileInputStream(temp)) {
@@ -317,9 +338,24 @@ public class PrefsFragment extends PreferenceFragmentCompat implements SharedPre
         } catch (IOException e) {
             return false;
         }
+        // 校验 Planet 文件结构（ZeroTier 1.16 使用了新的签名长度，旧版文件无法被内核解析）
+        try {
+            PlanetFile.parse(temp);
+        } catch (PlanetFile.FormatException e) {
+            Log.w(TAG, "Planet file is not compatible with the current ZeroTier core: " + e.getMessage());
+            this.planetErrorRes = R.string.planet_incompatible;
+            return false;
+        } catch (IOException e) {
+            Log.e(TAG, "Cannot read planet file", e);
+            return false;
+        }
         // 移动临时文件
         File dest = new File(requireActivity().getFilesDir(), Constants.FILE_CUSTOM_PLANET);
-        return temp.renameTo(dest);
+        boolean moved = temp.renameTo(dest);
+        if (moved) {
+            updatePlanetSetting();
+        }
+        return moved;
     }
 
     /**

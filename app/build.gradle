@@ -10,13 +10,14 @@ greendao {
 
 android {
     compileSdkVersion rootProject.ext.compileSdkVersion
+    ndkVersion '26.3.11579264'
 
     defaultConfig {
         applicationId "net.kaaass.zerotierfix"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 14
-        versionName "1.0.10"
+        versionCode 15
+        versionName "1.1.0"
         multiDexEnabled true
 
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'

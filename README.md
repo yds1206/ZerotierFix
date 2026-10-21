@@ -19,6 +19,7 @@
 
 ## Features
 
+- ZeroTier core 1.16.2 (official upstream)
 - Self-hosted Moon Support
 - Add custom planet config via file and URL
 - View peers list

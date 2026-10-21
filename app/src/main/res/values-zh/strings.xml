@@ -120,6 +120,8 @@
     <string name="cannot_download_planet_file">无法下载 Planet 文件</string>
     <string name="set_planet_succ">成功设置 Planet 文件</string>
     <string name="planet_wrong_format">Planet 文件格式错误</string>
+    <string name="planet_incompatible">该 Planet 文件由旧版 ZeroTier 生成，与当前内核（1.16）不兼容。请使用 ZeroTier 1.16 及以上版本重新生成。</string>
+    <string name="planet_id_summary">当前 Planet：%1$s</string>
     <string name="downloading">下载中</string>
     <string name="planet_download_timeout">下载 Planet 文件超时</string>
     <string name="planet_use_custom_summary">可以让客户端完全隔离 Zerotier 官方服务器。需手动重连使配置生效。</string>
