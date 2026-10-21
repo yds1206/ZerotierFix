@@ -338,11 +338,11 @@ public class PrefsFragment extends PreferenceFragmentCompat implements SharedPre
         } catch (IOException e) {
             return false;
         }
-        // 校验 Planet 文件结构（ZeroTier 1.16 使用了新的签名长度，旧版文件无法被内核解析）
+        // 校验 Planet 文件结构，避免损坏的文件被写入后内核静默回退到官方 Planet
         try {
             PlanetFile.parse(temp);
         } catch (PlanetFile.FormatException e) {
-            Log.w(TAG, "Planet file is not compatible with the current ZeroTier core: " + e.getMessage());
+            Log.w(TAG, "Invalid planet file: " + e.getMessage());
             this.planetErrorRes = R.string.planet_incompatible;
             return false;
         } catch (IOException e) {

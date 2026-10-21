@@ -17,32 +17,29 @@
 当内核按规范路径 `planet` 读取世界（World）状态时，返回用户导入的 `planet.custom`；
 同时拦截写入和删除，避免自定义 Planet 被内核覆盖。
 
-## 2. Planet 文件格式不兼容（重要）
+## 2. Planet 文件格式（与旧版兼容）
 
-ZeroTier 1.16 改变了 World 的序列化格式：
+ZeroTier 1.12 与 1.16 的 World 序列化布局是**一致的**：64 字节公钥集合（C25519 + Ed25519）加 96 字节签名。
+1.12 里的常量名是 `ZT_C25519_PUBLIC_KEY_LEN`（值为 64），1.16 改名为 `ZT_ECC_PUBLIC_KEY_SET_LEN`，
+只是命名变化，二进制布局没有变化。
 
-- 1.12：`updatesMustBeSignedBy` 32 字节（C25519 公钥），签名 64 字节。
-- 1.16：`updatesMustBeSignedBy` 64 字节（C25519 + Ed25519 公钥集合），签名 96 字节。
+因此同一份 planet 文件可以直接在 1.12.2 内核（ZerotierFix 1.0.10）和 1.16.2 内核（1.1.0）之间复用。
+本机 `C:\ProgramData\ZeroTier\One\planet`（257 字节）就是这种格式，两个版本都能解析。
 
-因此 **旧版生成的 planet 文件无法被 1.16 内核解析**。内核解析失败会静默回退到官方 Planet，
-表现为"设置了自定义 Planet 但仍然连的是官方网络"。
+App 导入时仍会做结构校验（`PlanetFile`），目的有两个：
 
-本版本在导入时会解析并校验新的二进制布局：
+- 拦住下载不完整或已损坏的文件，避免内核解析失败后静默回退到官方 Planet。
+- 在设置页显示当前 Planet ID，便于确认自己指向的是哪个自建 Planet。
 
-- 合法：移动到 `files/planet.custom`，设置页会显示 Planet ID。
-- 旧版/损坏：提示 `planet_incompatible`，不会写入。
+校验通过后写入 `files/planet.custom`，由 `DataStore` 在内核请求 `planet` 状态对象时返回。
 
-### 用 1.16.2 重新生成 Planet
-
-在已经部署自建控制器（如 ztncui）的服务器上，使用 1.16.2 的 `zerotier-idtool`：
+如果确实需要重新生成 Planet（例如更换根节点地址），使用 1.16.2 的 `zerotier-idtool`：
 
 ```bash
-# planet.json 里 id 为自建 Planet 的 ID，roots 为 moon/root 节点身份与地址
 zerotier-idtool genmoon planet.json
 ```
 
-`genmoon` 支持 `worldType: "planet"`，生成的文件名为 `<planet-id>.moon`，把它导入 App 即可。
-注意：必须使用 **1.16 及以上版本** 的 `zerotier-idtool`，旧版本生成的文件会被 App 拒绝。
+`genmoon` 支持 `worldType: "planet"`，生成的文件名为 `<planet-id>.moon`，导入 App 即可。
 
 一个最小可用的 `planet.json` 结构：
 
@@ -85,7 +82,7 @@ git submodule update --init --recursive
 
 - `:core:buildCMakeDebug[arm64-v8a]` 编译并链接 `libZeroTierOneJNI.so` 成功。
 - `:app:testDebugUnitTest --tests net.kaaass.zerotierfix.util.PlanetFileTest` 通过（4 个用例：
-  正常解析、截断文件、1.16 之前格式、root 数量越界）。
+  正常解析、截断文件、不受支持的公钥布局、root 数量越界）。
 - `:app:assembleDebug` 产出可安装 APK，`lib/arm64-v8a/libZeroTierOneJNI.so` 导出全部
   `Java_com_zerotier_sdk_Node_*` JNI 符号。
 
